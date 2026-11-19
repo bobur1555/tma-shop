@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Store Mini App</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: var(--tg-theme-bg-color, #ffffff);
+      --secondary-bg: var(--tg-theme-secondary-bg-color, #f4f4f5);
+      --text: var(--tg-theme-text-color, #111827);
+      --hint: var(--tg-theme-hint-color, #6b7280);
+      --btn: var(--tg-theme-button-color, #111827);
+      --btn-text: var(--tg-theme-button-text-color, #ffffff);
+      --accent: #2563eb;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 14px 14px 90px; }
+
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    header h1 { font-size: 20px; font-weight: 700; }
+    .badge { background: var(--secondary-bg); padding: 5px 10px; border-radius: 12px; font-size: 12px; color: var(--hint); }
+
+    .tabs { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 16px; padding-bottom: 4px; }
+    .tab {
+      background: var(--secondary-bg); color: var(--text); border: none;
+      padding: 8px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+    }
+    .tab.active { background: var(--btn); color: var(--btn-text); }
+
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .card {
+      background: var(--secondary-bg); border-radius: 14px; overflow: hidden;
+      display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .card img { width: 100%; height: 150px; object-fit: cover; background: #e5e7eb; }
+    .card-body { padding: 10px; }
+    .card-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; line-height: 1.25; }
+    .card-price { font-size: 13px; font-weight: 700; color: var(--accent); margin-bottom: 8px; }
+
+    .sizes { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
+    .size-btn {
+      border: 1px solid var(--hint); background: transparent; color: var(--text);
+      border-radius: 6px; padding: 2px 7px; font-size: 11px; cursor: pointer;
+    }
+    .size-btn.selected { background: var(--btn); color: var(--btn-text); border-color: var(--btn); }
+
+    .add-btn {
+      width: 100%; padding: 8px; border: none; border-radius: 10px;
+      background: var(--btn); color: var(--btn-text); font-weight: 600; font-size: 13px; cursor: pointer;
+    }
+
+    /* Нижняя панель корзины */
+    .cart-bar {
+      position: fixed; bottom: 12px; left: 14px; right: 14px;
+      background: var(--btn); color: var(--btn-text);
+      padding: 14px 18px; border-radius: 14px;
+      display: none; justify-content: space-between; align-items: center;
+      font-weight: 600; font-size: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.2); cursor: pointer;
+    }
+
+    /* Модальное окно оформления */
+    .modal {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+      display: none; align-items: flex-end; z-index: 100;
+    }
+    .modal-content {
+      background: var(--bg); width: 100%; border-radius: 20px 20px 0 0;
+      padding: 20px; max-height: 85vh; overflow-y: auto;
+    }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .cart-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 0; border-bottom: 1px solid var(--secondary-bg); font-size: 14px;
+    }
+    .remove-btn { color: #ef4444; background: none; border: none; font-size: 13px; cursor: pointer; margin-left: 8px; }
+
+    .form-group { margin-top: 12px; }
+    .form-group label { display: block; font-size: 12px; color: var(--hint); margin-bottom: 4px; }
+    .form-group input, .form-group select {
+      width: 100%; padding: 10px 12px; border-radius: 10px;
+      border: 1px solid var(--secondary-bg); background: var(--secondary-bg); color: var(--text); font-size: 14px;
+    }
+    .submit-btn {
+      width: 100%; margin-top: 16px; padding: 14px; border: none; border-radius: 12px;
+      background: #16a34a; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>URBAN WEAR UZ</h1>
+    <span class="badge">Ташкент • Доставка 24ч</span>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" onclick="filterCategory('all', this)">Все товары</button>
+    <button class="tab" onclick="filterCategory('shoes', this)">Обувь</button>
+    <button class="tab" onclick="filterCategory('clothes', this)">Одежда</button>
+  </div>
+
+  <div class="grid" id="catalog"></div>
+
+  <div class="cart-bar" id="cartBar" onclick="openCheckout()">
+    <span id="cartCount">Корзина (0)</span>
+    <span id="cartTotal">0 сум →</span>
+  </div>
+
+  <div class="modal" id="checkoutModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Ваш заказ</h3>
+        <button onclick="closeCheckout()" style="background:none;border:none;font-size:20px;color:var(--text);">✕</button>
+      </div>
+
+      <div id="cartItems"></div>
+
+      <div class="form-group">
+        <label>Ваше имя</label>
+        <input type="text" id="customerName" placeholder="Например: Бобур" />
+      </div>
+      <div class="form-group">
+        <label>Номер телефона</label>
+        <input type="tel" id="customerPhone" placeholder="+998 90 123 45 67" />
+      </div>
+      <div class="form-group">
+        <label>Адрес доставки</label>
+        <input type="text" id="customerAddress" placeholder="Район, улица, дом / ориентир" />
+      </div>
+      <div class="form-group">
+        <label>Способ оплаты</label>
+        <select id="paymentMethod">
+          <option value="Click / Payme">Click / Payme (онлайн)</option>
+          <option value="Наличными курьеру">Наличными при получении</option>
+        </select>
+      </div>
+
+      <button class="submit-btn" onclick="submitOrder()">Подтвердить заказ</button>
+    </div>
+  </div>
+
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.expand(); // Открываем на весь экран Telegram
+
+    // Демо-товары (можешь менять фото, названия и цены)
+    const products = [
+      {
+        id: 1, category: 'shoes', title: 'Кроссовки Air Runner Black', price: 420000,
+        sizes: ['40', '41', '42', '43'],
+        img: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&q=80'
+      },
+      {
+        id: 2, category: 'clothes', title: 'Худи Oversize Heavy Cotton', price: 290000,
+        sizes: ['M', 'L', 'XL'],
+        img: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=500&q=80'
+      },
+      {
+        id: 3, category: 'shoes', title: 'Кеды Classic White Leather', price: 380000,
+        sizes: ['39', '40', '41', '42'],
+        img: 'https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?w=500&q=80'
+      },
+      {
+        id: 4, category: 'clothes', title: 'Куртка Windbreaker Street', price: 540000,
+        sizes: ['M', 'L', 'XL'],
+        img: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=500&q=80'
+      }
+    ];
+
+    let selectedSizes = {};
+    let cart = [];
+
+    // Подставляем имя пользователя из Telegram, если доступно
+    if (tg.initDataUnsafe?.user?.first_name) {
+      document.getElementById('customerName').value = tg.initDataUnsafe.user.first_name;
+    }
+
+    function formatSum(num) {
+      return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' сум';
+    }
+
+    function renderCatalog(filter = 'all') {
+      const container = document.getElementById('catalog');
+      container.innerHTML = '';
+      const filtered = filter === 'all' ? products : products.filter(p => p.category === filter);
+
+      filtered.forEach(p => {
+        if (!selectedSizes[p.id]) selectedSizes[p.id] = p.sizes[0];
+        const sizesHtml = p.sizes.map(s =>
+          `<button class="size-btn ${selectedSizes[p.id] === s ? 'selected' : ''}" onclick="selectSize(${p.id}, '${s}')">${s}</button>`
+        ).join('');
+
+        container.innerHTML += `
+          <div class="card">
+            <img src="${p.img}" alt="${p.title}" />
+            <div class="card-body">
+              <div class="card-title">${p.title}</div>
+              <div class="card-price">${formatSum(p.price)}</div>
+              <div class="sizes">${sizesHtml}</div>
+              <button class="add-btn" onclick="addToCart(${p.id})">+ В корзину</button>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    function selectSize(productId, size) {
+      selectedSizes[productId] = size;
+      const activeTab = document.querySelector('.tab.active').textContent;
+      const filter = activeTab === 'Обувь' ? 'shoes' : activeTab === 'Одежда' ? 'clothes' : 'all';
+      renderCatalog(filter);
+    }
+
+    function filterCategory(cat, btn) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      renderCatalog(cat);
+    }
+
+    function addToCart(productId) {
+      const product = products.find(p => p.id === productId);
+      const size = selectedSizes[productId];
+      cart.push({ ...product, size });
+      if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      updateCartBar();
+    }
+
+    function updateCartBar() {
+      const bar = document.getElementById('cartBar');
+      if (cart.length === 0) {
+        bar.style.display = 'none';
+        return;
+      }
+      const total = cart.reduce((sum, item) => sum + item.price, 0);
+      document.getElementById('cartCount').textContent = `Корзина (${cart.length})`;
+      document.getElementById('cartTotal').textContent = `${formatSum(total)} →`;
+      bar.style.display = 'flex';
+    }
+
+    function openCheckout() {
+      const list = document.getElementById('cartItems');
+      list.innerHTML = cart.map((item, idx) => `
+        <div class="cart-item">
+          <div><b>${item.title}</b> (размер: ${item.size})<br><span style="color:var(--hint)">${formatSum(item.price)}</span></div>
+          <button class="remove-btn" onclick="removeItem(${idx})">Удалить</button>
+        </div>
+      `).join('');
+      document.getElementById('checkoutModal').style.display = 'flex';
+    }
+
+    function closeCheckout() {
+      document.getElementById('checkoutModal').style.display = 'none';
+    }
+
+    function removeItem(index) {
+      cart.splice(index, 1);
+      updateCartBar();
+      if (cart.length === 0) closeCheckout();
+      else openCheckout();
+    }
+
+    function submitOrder() {
+      const name = document.getElementById('customerName').value.trim();
+      const phone = document.getElementById('customerPhone').value.trim();
+      const address = document.getElementById('customerAddress').value.trim();
+      const payment = document.getElementById('paymentMethod').value;
+
+      if (!name || !phone || !address) {
+        alert('Пожалуйста, заполните имя, телефон и адрес доставки!');
+        return;
+      }
+
+      const total = cart.reduce((sum, item) => sum + item.price, 0);
+      const orderData = {
+        customer: { name, phone, address, payment },
+        items: cart.map(i => ({ title: i.title, size: i.size, price: i.price })),
+        total: total
+      };
+
+      // Отправляем данные заказа обратно в Telegram-бот
+      tg.sendData(JSON.stringify(orderData));
+    }
+
+    renderCatalog();
+  </script>
+</body>
+</html>
